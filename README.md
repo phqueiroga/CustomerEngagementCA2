@@ -34,7 +34,7 @@ backend/requirements.txt  Python production dependency
 
 5. Apply the variables to Production, Preview, and Development as appropriate.
 6. Deploy the project.
-7. Verify `https://YOUR_VERCEL_PROJECT.vercel.app/api/health`.
+7. Verify `https://YOUR_VERCEL_PROJECT.vercel.app/api`.
 
 Environment variable changes apply only to new deployments. Redeploy after
 changing one. Never put `ANTHROPIC_API_KEY` in the frontend or a GitHub Pages
@@ -92,7 +92,7 @@ http://localhost:8000,https://YOUR_GITHUB_USERNAME.github.io
 
 ## API
 
-### `GET /api/health`
+### `GET /api`
 
 Returns:
 
@@ -100,7 +100,7 @@ Returns:
 {"status":"ok"}
 ```
 
-### `POST /api/chat`
+### `POST /api`
 
 Request:
 
@@ -130,4 +130,3 @@ Run:
 ```bash
 python3 -m unittest discover -s tests -v
 ```
-

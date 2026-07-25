@@ -43,7 +43,7 @@ async function sendMessage(content) {
     );
   }
 
-  const response = await fetch(`${apiBaseUrl}/api/chat`, {
+  const response = await fetch(`${apiBaseUrl}/api`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages: conversation }),
@@ -102,4 +102,3 @@ clearButton.addEventListener("click", () => {
   statusElement.textContent = "";
   input.focus();
 });
-
