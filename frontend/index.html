@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A simple customer engagement chatbot">
+    <title>Customer Assistant</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="chat-shell">
+      <header>
+        <div>
+          <p class="eyebrow">Customer engagement</p>
+          <h1>Customer Assistant</h1>
+        </div>
+        <button id="clear-button" class="secondary-button" type="button">New chat</button>
+      </header>
+
+      <section
+        id="messages"
+        class="messages"
+        aria-live="polite"
+        aria-label="Conversation"
+      >
+        <article class="message assistant">
+          <div class="bubble">Hello! How can I help you today?</div>
+        </article>
+      </section>
+
+      <p id="status" class="status" role="status"></p>
+
+      <form id="chat-form">
+        <label for="message-input">Your message</label>
+        <div class="composer">
+          <textarea
+            id="message-input"
+            name="message"
+            rows="2"
+            maxlength="4000"
+            placeholder="Type a message…"
+            required
+          ></textarea>
+          <button id="send-button" type="submit">Send</button>
+        </div>
+      </form>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
+

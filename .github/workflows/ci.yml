@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Compile backend
+        run: python -m compileall -q backend
+
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Check required frontend files
+        run: test -f frontend/index.html && test -f frontend/app.js && test -f frontend/styles.css
+
