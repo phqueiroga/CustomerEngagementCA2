@@ -123,6 +123,36 @@ def fetch_live_catalogue() -> tuple[str, dict[str, str]]:
     offer_count = sum(
         bool((row.get("special_offer") or "").strip()) for row in catalogue_rows
     )
+    data_quality_warnings = []
+    for row in catalogue_rows:
+        sku = (row.get("sku") or "Unknown SKU").strip()
+        product_name = (row.get("product_name") or "Unknown product").strip()
+        try:
+            price = float((row.get("price_eur") or "").strip())
+        except ValueError:
+            price = 0
+        try:
+            stock = int((row.get("stock_this_week") or "").strip())
+        except ValueError:
+            stock = -1
+        availability = (row.get("availability") or "").strip()
+
+        if price >= 1_000:
+            data_quality_warnings.append(
+                f"{sku} ({product_name}) has an implausibly high listed price "
+                f"of EUR {price:,.0f}. Report it exactly, label it implausible, "
+                "and recommend human verification."
+            )
+        if stock == 0 and availability.casefold() == "in stock":
+            data_quality_warnings.append(
+                f"{sku} ({product_name}) is marked 'In stock' but "
+                "stock_this_week is 0. Explicitly call this an internal source "
+                "inconsistency and recommend checking with staff."
+            )
+
+    warning_text = "\n".join(
+        f"- {warning}" for warning in data_quality_warnings
+    ) or "- None detected."
     metadata = {
         "source": "Emerald Pantry Google Sheet",
         "source_url": source_url,
@@ -133,6 +163,7 @@ def fetch_live_catalogue() -> tuple[str, dict[str, str]]:
         f"FETCHED_AT_UTC: {fetched_at}\n"
         f"SOURCE_URL: {source_url}\n"
         f"SPECIAL_OFFER_ROW_COUNT: {offer_count}\n"
+        f"LIVE_DATA_QUALITY_WARNINGS:\n{warning_text}\n"
         "The following CSV was fetched for this request. Report its values "
         "faithfully and do not silently correct surprising data.\n\n"
         f"{csv_text}"
@@ -165,7 +196,11 @@ def create_reply(
         "earlier. Never answer current catalogue facts from memory. Treat the "
         "tool output as the assigned live source and report it faithfully. If "
         "values conflict or look surprising, state what the source says and "
-        "briefly flag the inconsistency rather than silently correcting it. If "
+        "explicitly flag the inconsistency rather than explaining it away. "
+        "Recommend human verification for an implausible price or contradictory "
+        "availability. Do not infer how long an offer will run, whether it will "
+        "apply when stock returns, or a discounted final price unless the live "
+        "source explicitly provides that fact. If "
         "you list catalogue rows, do not introduce the list with a numeric count "
         "unless you have verified that it exactly matches the items listed. If "
         "the tool fails, say that live catalogue information is temporarily "

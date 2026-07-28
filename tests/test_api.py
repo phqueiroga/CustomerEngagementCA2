@@ -106,8 +106,42 @@ class LiveCatalogueTests(unittest.TestCase):
         self.assertEqual(request.get_header("Cache-control"), "no-cache")
         self.assertIn("Test Oats", content)
         self.assertIn("SPECIAL_OFFER_ROW_COUNT: 0", content)
+        self.assertIn("LIVE_DATA_QUALITY_WARNINGS:\n- None detected.", content)
         self.assertEqual(metadata["source"], "Emerald Pantry Google Sheet")
         self.assertIn("fetched_at", metadata)
+
+    def test_flags_live_price_and_stock_anomalies(self):
+        csv_text = (
+            "sku,product_name,category,barcode,price_eur,unit,availability,"
+            "stock_this_week,special_offer,description\n"
+            "EP-1,Test Preserve,pantry,123,2900450,340g,In stock,12,,Test\n"
+            "EP-2,Test Biscuits,bakery,456,4,pack,In stock,0,20% off,Test\n"
+        )
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, _limit):
+                return csv_text.encode()
+
+        with patch.dict(
+            os.environ,
+            {
+                "GOOGLE_SHEET_CSV_URL": (
+                    "https://docs.google.com/spreadsheets/d/test/export?format=csv"
+                )
+            },
+        ):
+            with patch.object(chat_api, "urlopen", return_value=FakeResponse()):
+                content, _metadata = chat_api.fetch_live_catalogue()
+
+        self.assertIn("EUR 2,900,450", content)
+        self.assertIn("stock_this_week is 0", content)
+        self.assertIn("internal source inconsistency", content)
 
     def test_rejects_unexpected_catalogue_format(self):
         class FakeResponse:
