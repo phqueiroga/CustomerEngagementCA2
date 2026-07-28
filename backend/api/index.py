@@ -160,6 +160,8 @@ def create_reply(
         "tool output as the assigned live source and report it faithfully. If "
         "values conflict or look surprising, state what the source says and "
         "briefly flag the inconsistency rather than silently correcting it. If "
+        "you list catalogue rows, do not introduce the list with a numeric count "
+        "unless you have verified that it exactly matches the items listed. If "
         "the tool fails, say that live catalogue information is temporarily "
         "unavailable; never guess. For general or off-topic questions, answer "
         "naturally without calling the catalogue unless current product data is "
