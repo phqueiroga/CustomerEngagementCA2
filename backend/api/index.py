@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import os
 from datetime import datetime, timezone
@@ -112,12 +114,15 @@ def fetch_live_catalogue() -> tuple[str, dict[str, str]]:
         raise RuntimeError("The live catalogue response is too large.")
 
     csv_text = payload.decode("utf-8-sig")
-    first_line = csv_text.splitlines()[0] if csv_text else ""
-    columns = {column.strip() for column in first_line.split(",")}
+    catalogue_rows = list(csv.DictReader(io.StringIO(csv_text)))
+    columns = set(catalogue_rows[0]) if catalogue_rows else set()
     if not REQUIRED_CATALOGUE_COLUMNS.issubset(columns):
         raise RuntimeError("The live catalogue has an unexpected format.")
 
     fetched_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    offer_count = sum(
+        bool((row.get("special_offer") or "").strip()) for row in catalogue_rows
+    )
     metadata = {
         "source": "Emerald Pantry Google Sheet",
         "source_url": source_url,
@@ -127,6 +132,7 @@ def fetch_live_catalogue() -> tuple[str, dict[str, str]]:
         "LIVE SOURCE: Emerald Pantry assigned Google Sheet\n"
         f"FETCHED_AT_UTC: {fetched_at}\n"
         f"SOURCE_URL: {source_url}\n"
+        f"SPECIAL_OFFER_ROW_COUNT: {offer_count}\n"
         "The following CSV was fetched for this request. Report its values "
         "faithfully and do not silently correct surprising data.\n\n"
         f"{csv_text}"

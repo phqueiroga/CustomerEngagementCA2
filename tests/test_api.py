@@ -105,6 +105,7 @@ class LiveCatalogueTests(unittest.TestCase):
         request = mocked.call_args.args[0]
         self.assertEqual(request.get_header("Cache-control"), "no-cache")
         self.assertIn("Test Oats", content)
+        self.assertIn("SPECIAL_OFFER_ROW_COUNT: 0", content)
         self.assertEqual(metadata["source"], "Emerald Pantry Google Sheet")
         self.assertIn("fetched_at", metadata)
 
