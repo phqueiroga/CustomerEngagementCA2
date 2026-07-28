@@ -120,6 +120,9 @@ form.addEventListener("submit", async (event) => {
     input.disabled = false;
     sendButton.disabled = false;
     clearButton.disabled = false;
+    if (statusElement.textContent === "The assistant is thinking…") {
+      statusElement.textContent = "";
+    }
     input.focus();
   }
 });
