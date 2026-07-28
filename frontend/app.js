@@ -45,20 +45,31 @@ function appendMessage(role, content) {
   article.className = `message ${role}`;
 
   if (role === "assistant") {
-    const avatar = document.createElement("div");
+    const avatar = document.createElement("img");
     avatar.className = "avatar";
     avatar.setAttribute("aria-hidden", "true");
-    avatar.textContent = "EP";
+    avatar.alt = "";
+    avatar.src = "assets/emerald-pantry-logo.png";
     article.append(avatar);
   }
 
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  bubble.textContent = content;
+  bubble.textContent = compactMessage(content);
 
   article.append(bubble);
   messagesElement.append(article);
   messagesElement.scrollTop = messagesElement.scrollHeight;
+}
+
+function compactMessage(content) {
+  return content
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trim().replace(/[ \t]{2,}/g, " "))
+    .join("\n")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
 }
 
 function setBusy(busy) {
