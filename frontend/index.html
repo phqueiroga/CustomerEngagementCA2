@@ -3,16 +3,26 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="A simple customer engagement chatbot">
-    <title>Customer Assistant</title>
+    <meta
+      name="description"
+      content="Emerald Pantry's AI-powered customer-support assistant"
+    >
+    <title>Emerald Pantry Assistant</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <main class="chat-shell">
-      <header>
-        <div>
-          <p class="eyebrow">Customer engagement</p>
-          <h1>Customer Assistant</h1>
+      <header class="brand-header">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">EP</div>
+          <div>
+            <p class="eyebrow">Emerald Pantry</p>
+            <h1>Pantry Assistant</h1>
+            <p class="availability">
+              <span class="status-dot" aria-hidden="true"></span>
+              AI assistant online
+            </p>
+          </div>
         </div>
         <button id="clear-button" class="secondary-button" type="button">New chat</button>
       </header>
@@ -24,25 +34,33 @@
         aria-label="Conversation"
       >
         <article class="message assistant">
-          <div class="bubble">Hello! How can I help you today?</div>
+          <div class="avatar" aria-hidden="true">EP</div>
+          <div class="bubble">
+            Welcome to Emerald Pantry. I can help with general shopping questions,
+            food ideas, and customer support. What can I help you with today?
+          </div>
         </article>
       </section>
 
       <p id="status" class="status" role="status"></p>
 
       <form id="chat-form">
-        <label for="message-input">Your message</label>
+        <label for="message-input">Ask Emerald Pantry</label>
         <div class="composer">
           <textarea
             id="message-input"
             name="message"
             rows="2"
             maxlength="4000"
-            placeholder="Type a message…"
+            placeholder="Ask a question or test me with something unexpected…"
             required
           ></textarea>
           <button id="send-button" type="submit">Send</button>
         </div>
+        <p class="disclaimer">
+          This assistant uses a live language model. Please do not share personal
+          or payment information.
+        </p>
       </form>
     </main>
 
@@ -50,4 +68,3 @@
     <script src="app.js"></script>
   </body>
 </html>
-

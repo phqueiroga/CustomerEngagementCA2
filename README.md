@@ -8,6 +8,24 @@ A minimal chatbot with:
 
 The Anthropic API key is never sent to the browser or committed to Git.
 
+## Assignment implementation
+
+This repository is the Emerald Pantry implementation for the Customer
+Engagement and Artificial Intelligence CA2.
+
+Task 1 provides:
+
+- an Emerald Pantry customer-support interface;
+- a genuine Anthropic-backed language-model response for every submitted
+  question;
+- natural handling of off-topic and unscripted prompts; and
+- an explicit boundary against inventing live catalogue information before the
+  Google Sheet integration is added in Task 2.
+
+The frontend contains no canned response table. The initial welcome message is
+static interface copy; submitted questions are sent to the Python API and then
+to Anthropic.
+
 ## Repository layout
 
 ```text

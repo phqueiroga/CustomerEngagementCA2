@@ -8,10 +8,46 @@ const clearButton = document.querySelector("#clear-button");
 const conversation = [];
 const configuredUrl = window.APP_CONFIG?.apiBaseUrl ?? "";
 const apiBaseUrl = configuredUrl.replace(/\/+$/, "");
+const welcomeMessage =
+  "Welcome to Emerald Pantry. I can help with general shopping questions, " +
+  "food ideas, and customer support. What can I help you with today?";
+
+// Task 1 establishes the business context while keeping live catalogue claims
+// out of scope until the Google Sheet is connected in Task 2.
+const businessContext = [
+  {
+    role: "user",
+    content:
+      "Act as the customer-support assistant for Emerald Pantry, an Irish " +
+      "online grocery and specialty-food business. Be warm, concise, and " +
+      "helpful. You may answer general shopping, food, and support questions " +
+      "using your language ability. The live product catalogue is not connected " +
+      "yet, so never invent or confirm current prices, stock, barcodes, special " +
+      "offers, delivery availability, or product-specific facts. Explain that " +
+      "live catalogue details are not available and invite the customer to ask " +
+      "a general question instead. For unrelated or absurd questions, respond " +
+      "naturally and briefly, then gently offer relevant Emerald Pantry help. " +
+      "Do not claim to be human.",
+  },
+  {
+    role: "assistant",
+    content:
+      "Understood. I will support Emerald Pantry customers without inventing " +
+      "live catalogue information.",
+  },
+];
 
 function appendMessage(role, content) {
   const article = document.createElement("article");
   article.className = `message ${role}`;
+
+  if (role === "assistant") {
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.setAttribute("aria-hidden", "true");
+    avatar.textContent = "EP";
+    article.append(avatar);
+  }
 
   const bubble = document.createElement("div");
   bubble.className = "bubble";
@@ -46,7 +82,7 @@ async function sendMessage(content) {
   const response = await fetch(`${apiBaseUrl}/api`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages: conversation }),
+    body: JSON.stringify({ messages: [...businessContext, ...conversation] }),
   });
 
   let payload;
@@ -98,7 +134,7 @@ input.addEventListener("keydown", (event) => {
 clearButton.addEventListener("click", () => {
   conversation.length = 0;
   messagesElement.replaceChildren();
-  appendMessage("assistant", "Hello! How can I help you today?");
+  appendMessage("assistant", welcomeMessage);
   statusElement.textContent = "";
   input.focus();
 });
