@@ -24,23 +24,22 @@ const businessContext = [
       "using your language ability. Write in clear plain text without Markdown " +
       "formatting. Treat dietary requirements seriously: suggest a complete, " +
       "inclusive alternative rather than leaving a customer with side dishes, " +
-      "and remind customers to verify labels for allergies. The live product catalogue is not connected " +
-      "yet, so never invent or confirm current prices, stock, barcodes, special " +
-      "offers, delivery availability, or product-specific facts. Explain that " +
-      "live catalogue details are not available and invite the customer to ask " +
-      "a general question instead. For unrelated or absurd questions, respond " +
+      "and remind customers to verify labels for allergies. Use the server's " +
+      "live catalogue tool for current prices, stock, barcodes, offers, " +
+      "availability, and other product-specific facts. Never guess catalogue " +
+      "facts if the live tool fails. For unrelated or absurd questions, respond " +
       "naturally and briefly, then gently offer relevant Emerald Pantry help. " +
       "Do not claim to be human.",
   },
   {
     role: "assistant",
     content:
-      "Understood. I will support Emerald Pantry customers without inventing " +
-      "live catalogue information.",
+      "Understood. I will use the live catalogue for current product facts and " +
+      "will not invent information if it is unavailable.",
   },
 ];
 
-function appendMessage(role, content) {
+function appendMessage(role, content, liveData = null) {
   const article = document.createElement("article");
   article.className = `message ${role}`;
 
@@ -57,7 +56,32 @@ function appendMessage(role, content) {
   bubble.className = "bubble";
   bubble.textContent = compactMessage(content);
 
-  article.append(bubble);
+  if (role === "assistant") {
+    const responseStack = document.createElement("div");
+    responseStack.className = "response-stack";
+    responseStack.append(bubble);
+
+    if (liveData?.fetched_at) {
+      const liveSource = document.createElement("a");
+      liveSource.className = "live-source";
+      liveSource.href = liveData.source_url;
+      liveSource.target = "_blank";
+      liveSource.rel = "noopener noreferrer";
+      const fetchedAt = new Date(liveData.fetched_at);
+      const time = Number.isNaN(fetchedAt.getTime())
+        ? "just now"
+        : fetchedAt.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZoneName: "short",
+          });
+      liveSource.textContent = `Live Google Sheet checked at ${time}`;
+      responseStack.append(liveSource);
+    }
+    article.append(responseStack);
+  } else {
+    article.append(bubble);
+  }
   messagesElement.append(article);
   messagesElement.scrollTop = messagesElement.scrollHeight;
 }
@@ -110,7 +134,7 @@ async function sendMessage(content) {
     throw new Error(payload.error || "The request failed. Please try again.");
   }
 
-  return payload.reply;
+  return payload;
 }
 
 form.addEventListener("submit", async (event) => {
@@ -124,9 +148,9 @@ form.addEventListener("submit", async (event) => {
   setBusy(true);
 
   try {
-    const reply = await sendMessage(content);
-    conversation.push({ role: "assistant", content: reply });
-    appendMessage("assistant", reply);
+    const result = await sendMessage(content);
+    conversation.push({ role: "assistant", content: result.reply });
+    appendMessage("assistant", result.reply, result.live_data);
   } catch (error) {
     statusElement.textContent =
       error instanceof Error ? error.message : "Something went wrong.";

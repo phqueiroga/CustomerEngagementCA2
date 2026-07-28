@@ -73,6 +73,64 @@ class ConfigurationTests(unittest.TestCase):
                 chat_api.create_reply([{"role": "user", "content": "Hello"}])
 
 
+class LiveCatalogueTests(unittest.TestCase):
+    def test_fetches_and_validates_live_csv_without_cache_headers(self):
+        csv_text = (
+            "sku,product_name,category,barcode,price_eur,unit,availability,"
+            "stock_this_week,special_offer,description\n"
+            "EP-1,Test Oats,pantry,123,3,500g,In stock,5,,Fresh oats\n"
+        )
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, _limit):
+                return csv_text.encode()
+
+        with patch.dict(
+            os.environ,
+            {
+                "GOOGLE_SHEET_CSV_URL": (
+                    "https://docs.google.com/spreadsheets/d/test/export?format=csv"
+                )
+            },
+        ):
+            with patch.object(chat_api, "urlopen", return_value=FakeResponse()) as mocked:
+                content, metadata = chat_api.fetch_live_catalogue()
+
+        request = mocked.call_args.args[0]
+        self.assertEqual(request.get_header("Cache-control"), "no-cache")
+        self.assertIn("Test Oats", content)
+        self.assertEqual(metadata["source"], "Emerald Pantry Google Sheet")
+        self.assertIn("fetched_at", metadata)
+
+    def test_rejects_unexpected_catalogue_format(self):
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, _limit):
+                return b"name,price\nUnknown,4\n"
+
+        with patch.dict(
+            os.environ,
+            {
+                "GOOGLE_SHEET_CSV_URL": (
+                    "https://docs.google.com/spreadsheets/d/test/export?format=csv"
+                )
+            },
+        ):
+            with patch.object(chat_api, "urlopen", return_value=FakeResponse()):
+                with self.assertRaisesRegex(RuntimeError, "unexpected format"):
+                    chat_api.fetch_live_catalogue()
+
+
 if __name__ == "__main__":
     unittest.main()
-
