@@ -5,6 +5,7 @@ import os
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler
 from typing import Any
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
@@ -25,6 +26,28 @@ CATALOGUE_TOOL = {
             }
         },
         "required": ["reason"],
+    },
+}
+
+OPEN_FOOD_FACTS_TOOL = {
+    "name": "get_open_food_facts_product",
+    "description": (
+        "Fetch current public food-label data from Open Food Facts for one "
+        "barcode. Use it for questions about ingredients, allergens, nutrition, "
+        "Nutri-Score, NOVA processing group, brands, quantity, or product labels. "
+        "If the customer names an Emerald Pantry product without giving its "
+        "barcode, call get_live_catalogue first to obtain the barcode, then call "
+        "this tool. This is a separate live public source."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "barcode": {
+                "type": "string",
+                "description": "The 8- to 14-digit product barcode.",
+            }
+        },
+        "required": ["barcode"],
     },
 }
 
@@ -171,9 +194,76 @@ def fetch_live_catalogue() -> tuple[str, dict[str, str]]:
     return tool_content, metadata
 
 
+def fetch_open_food_facts(barcode: str) -> tuple[str, dict[str, str]]:
+    normalized_barcode = "".join(character for character in barcode if character.isdigit())
+    if not 8 <= len(normalized_barcode) <= 14:
+        raise RuntimeError("A valid 8- to 14-digit barcode is required.")
+
+    fields = (
+        "code,product_name,brands,quantity,ingredients_text,allergens_tags,"
+        "nutriscore_grade,nova_group,nutriments,url,last_modified_t"
+    )
+    api_url = (
+        "https://world.openfoodfacts.org/api/v3.6/product/"
+        f"{quote(normalized_barcode)}.json?fields={fields}"
+    )
+    request = Request(
+        api_url,
+        headers={
+            "User-Agent": (
+                "EmeraldPantryAssistant/1.0 "
+                "(https://phqueiroga.github.io/CustomerEngagementCA2/)"
+            ),
+            "Accept": "application/json",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+        },
+    )
+    with urlopen(request, timeout=12) as response:
+        payload = response.read(250_001)
+    if len(payload) > 250_000:
+        raise RuntimeError("The Open Food Facts response is too large.")
+
+    document = json.loads(payload.decode("utf-8"))
+    product = document.get("product")
+    if document.get("status") != "success" or not isinstance(product, dict):
+        raise RuntimeError("Open Food Facts has no product for that barcode.")
+
+    selected_product = {
+        "code": product.get("code"),
+        "product_name": product.get("product_name"),
+        "brands": product.get("brands"),
+        "quantity": product.get("quantity"),
+        "ingredients_text": product.get("ingredients_text"),
+        "allergens_tags": product.get("allergens_tags"),
+        "nutriscore_grade": product.get("nutriscore_grade"),
+        "nova_group": product.get("nova_group"),
+        "nutriments": product.get("nutriments"),
+        "last_modified_t": product.get("last_modified_t"),
+    }
+    fetched_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    product_url = f"https://world.openfoodfacts.org/product/{quote(normalized_barcode)}"
+    metadata = {
+        "source": "Open Food Facts",
+        "source_url": product_url,
+        "fetched_at": fetched_at,
+    }
+    tool_content = (
+        "LIVE PUBLIC SOURCE: Open Food Facts API v3.6\n"
+        f"FETCHED_AT_UTC: {fetched_at}\n"
+        f"SOURCE_URL: {product_url}\n"
+        "This community-contributed label data can be incomplete or inaccurate. "
+        "Report only fields present below, identify Open Food Facts as the "
+        "source, and remind customers to verify the physical package for "
+        "allergies or medical dietary decisions.\n\n"
+        f"{json.dumps(selected_product, ensure_ascii=False, separators=(',', ':'))}"
+    )
+    return tool_content, metadata
+
+
 def create_reply(
     messages: list[dict[str, str]],
-) -> tuple[str, dict[str, str] | None]:
+) -> tuple[str, list[dict[str, str]]]:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     model = os.environ.get("ANTHROPIC_MODEL")
     if not api_key or not model:
@@ -188,8 +278,9 @@ def create_reply(
     system_prompt = (
         "You are the AI customer-support assistant for Emerald Pantry, an Irish "
         "online grocery and specialty-food business. Be warm, concise, and "
-        "truthful. Write clear plain text without Markdown formatting. A live "
-        "catalogue tool is available. For every question involving products, "
+        "truthful. Write clear plain text without Markdown formatting. Two live "
+        "tools are available: the Emerald Pantry Google Sheet catalogue and "
+        "Open Food Facts public product-label data. For every question involving products, "
         "prices, stock, availability, barcodes, special offers, categories, "
         "units, or catalogue descriptions, you MUST call get_live_catalogue in "
         "that turn before answering, even if similar information appeared "
@@ -206,20 +297,29 @@ def create_reply(
         "the tool fails, say that live catalogue information is temporarily "
         "unavailable; never guess. For general or off-topic questions, answer "
         "naturally without calling the catalogue unless current product data is "
-        "needed. Do not claim to be human."
+        "needed. For ingredients, allergens, nutrition, Nutri-Score, NOVA group, "
+        "or label questions, you MUST call get_open_food_facts_product in that "
+        "turn. When the customer gives a product name rather than a barcode, call "
+        "get_live_catalogue first to get its current barcode, then call Open Food "
+        "Facts. When useful, combine catalogue facts such as price, stock, and "
+        "offers with public label facts in one answer. Clearly distinguish the "
+        "two sources. Treat Open Food Facts as community-contributed data and "
+        "always advise checking the physical package for allergies. If that tool "
+        "fails or has no product, say its live label data is unavailable and do "
+        "not invent it. Do not claim to be human."
     )
     working_messages: list[dict[str, Any]] = list(messages)
-    live_data: dict[str, str] | None = None
+    live_sources: list[dict[str, str]] = []
     result = client.messages.create(
         model=model,
         max_tokens=max_tokens,
         system=system_prompt,
-        tools=[CATALOGUE_TOOL],
+        tools=[CATALOGUE_TOOL, OPEN_FOOD_FACTS_TOOL],
         tool_choice={"type": "auto", "disable_parallel_tool_use": True},
         messages=working_messages,
     )
 
-    for _ in range(2):
+    for _ in range(3):
         tool_uses = [
             block for block in result.content if getattr(block, "type", None) == "tool_use"
         ]
@@ -228,7 +328,10 @@ def create_reply(
 
         tool_results = []
         for tool_use in tool_uses:
-            if tool_use.name != "get_live_catalogue":
+            if tool_use.name not in {
+                "get_live_catalogue",
+                "get_open_food_facts_product",
+            }:
                 tool_results.append(
                     {
                         "type": "tool_result",
@@ -239,7 +342,17 @@ def create_reply(
                 )
                 continue
             try:
-                tool_content, live_data = fetch_live_catalogue()
+                if tool_use.name == "get_live_catalogue":
+                    tool_content, source_metadata = fetch_live_catalogue()
+                else:
+                    barcode = (
+                        tool_use.input.get("barcode", "")
+                        if isinstance(tool_use.input, dict)
+                        else ""
+                    )
+                    tool_content, source_metadata = fetch_open_food_facts(barcode)
+                if source_metadata not in live_sources:
+                    live_sources.append(source_metadata)
                 tool_results.append(
                     {
                         "type": "tool_result",
@@ -248,11 +361,16 @@ def create_reply(
                     }
                 )
             except Exception:
+                source_name = (
+                    "assigned live Google Sheet"
+                    if tool_use.name == "get_live_catalogue"
+                    else "Open Food Facts"
+                )
                 tool_results.append(
                     {
                         "type": "tool_result",
                         "tool_use_id": tool_use.id,
-                        "content": "The assigned live Google Sheet could not be fetched.",
+                        "content": f"The {source_name} could not be fetched.",
                         "is_error": True,
                     }
                 )
@@ -267,7 +385,7 @@ def create_reply(
             model=model,
             max_tokens=max_tokens,
             system=system_prompt,
-            tools=[CATALOGUE_TOOL],
+            tools=[CATALOGUE_TOOL, OPEN_FOOD_FACTS_TOOL],
             tool_choice={"type": "auto", "disable_parallel_tool_use": True},
             messages=working_messages,
         )
@@ -277,7 +395,7 @@ def create_reply(
     ).strip()
     if not text:
         raise RuntimeError("The model returned no text.")
-    return text, live_data
+    return text, live_sources
 
 
 class handler(BaseHTTPRequestHandler):
@@ -337,7 +455,7 @@ class handler(BaseHTTPRequestHandler):
         try:
             payload = json.loads(self.rfile.read(content_length))
             messages = validate_messages(payload)
-            reply, live_data = create_reply(messages)
+            reply, live_sources = create_reply(messages)
         except (json.JSONDecodeError, UnicodeDecodeError):
             self._send_json(400, {"error": "The request body is not valid JSON."})
             return
@@ -352,8 +470,8 @@ class handler(BaseHTTPRequestHandler):
             return
 
         response: dict[str, Any] = {"reply": reply}
-        if live_data:
-            response["live_data"] = live_data
+        if live_sources:
+            response["live_sources"] = live_sources
         self._send_json(200, response)
 
     def log_message(self, format: str, *args: Any) -> None:

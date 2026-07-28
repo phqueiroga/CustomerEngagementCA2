@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 import pathlib
 import unittest
@@ -165,6 +166,60 @@ class LiveCatalogueTests(unittest.TestCase):
             with patch.object(chat_api, "urlopen", return_value=FakeResponse()):
                 with self.assertRaisesRegex(RuntimeError, "unexpected format"):
                     chat_api.fetch_live_catalogue()
+
+
+class OpenFoodFactsTests(unittest.TestCase):
+    def test_fetches_public_product_label_by_barcode(self):
+        api_document = {
+            "status": "success",
+            "product": {
+                "code": "8000500310427",
+                "product_name": "Nutella Biscuits",
+                "allergens_tags": ["en:gluten", "en:milk", "en:nuts"],
+                "nutriscore_grade": "e",
+                "nova_group": 4,
+            },
+        }
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, _limit):
+                return json.dumps(api_document).encode()
+
+        with patch.object(chat_api, "urlopen", return_value=FakeResponse()) as mocked:
+            content, metadata = chat_api.fetch_open_food_facts("8000 5003 1042 7")
+
+        request = mocked.call_args.args[0]
+        self.assertIn("/api/v3.6/product/8000500310427.json", request.full_url)
+        self.assertIn("EmeraldPantryAssistant", request.get_header("User-agent"))
+        self.assertEqual(request.get_header("Cache-control"), "no-cache")
+        self.assertIn("Nutella Biscuits", content)
+        self.assertIn("en:milk", content)
+        self.assertEqual(metadata["source"], "Open Food Facts")
+
+    def test_rejects_invalid_barcode(self):
+        with self.assertRaisesRegex(RuntimeError, "valid 8- to 14-digit"):
+            chat_api.fetch_open_food_facts("not-a-barcode")
+
+    def test_rejects_missing_public_product(self):
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, _limit):
+                return b'{"status":"failure","product":null}'
+
+        with patch.object(chat_api, "urlopen", return_value=FakeResponse()):
+            with self.assertRaisesRegex(RuntimeError, "no product"):
+                chat_api.fetch_open_food_facts("8000500310427")
 
 
 if __name__ == "__main__":

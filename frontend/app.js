@@ -27,7 +27,11 @@ const businessContext = [
       "and remind customers to verify labels for allergies. Use the server's " +
       "live catalogue tool for current prices, stock, barcodes, offers, " +
       "availability, and other product-specific facts. Never guess catalogue " +
-      "facts if the live tool fails. For unrelated or absurd questions, respond " +
+      "facts if the live tool fails. Use the live Open Food Facts tool for " +
+      "ingredients, allergens, nutrition, Nutri-Score, NOVA group, and product " +
+      "label questions. Make clear that its data is community-contributed and " +
+      "remind customers to verify the physical label for allergies. For " +
+      "unrelated or absurd questions, respond " +
       "naturally and briefly, then gently offer relevant Emerald Pantry help. " +
       "Do not claim to be human.",
   },
@@ -39,7 +43,7 @@ const businessContext = [
   },
 ];
 
-function appendMessage(role, content, liveData = null) {
+function appendMessage(role, content, liveSources = []) {
   const article = document.createElement("article");
   article.className = `message ${role}`;
 
@@ -61,7 +65,8 @@ function appendMessage(role, content, liveData = null) {
     responseStack.className = "response-stack";
     responseStack.append(bubble);
 
-    if (liveData?.fetched_at) {
+    for (const liveData of liveSources) {
+      if (!liveData?.fetched_at || !liveData?.source_url) continue;
       const liveSource = document.createElement("a");
       liveSource.className = "live-source";
       liveSource.href = liveData.source_url;
@@ -75,7 +80,7 @@ function appendMessage(role, content, liveData = null) {
             minute: "2-digit",
             timeZoneName: "short",
           });
-      liveSource.textContent = `Live Google Sheet checked at ${time}`;
+      liveSource.textContent = `${liveData.source} checked live at ${time}`;
       responseStack.append(liveSource);
     }
     article.append(responseStack);
@@ -165,7 +170,9 @@ form.addEventListener("submit", async (event) => {
   try {
     const result = await sendMessage(content);
     conversation.push({ role: "assistant", content: result.reply });
-    appendMessage("assistant", result.reply, result.live_data);
+    const liveSources =
+      result.live_sources ?? (result.live_data ? [result.live_data] : []);
+    appendMessage("assistant", result.reply, liveSources);
   } catch (error) {
     statusElement.textContent =
       error instanceof Error ? error.message : "Something went wrong.";
