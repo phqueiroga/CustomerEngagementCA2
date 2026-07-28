@@ -54,7 +54,7 @@ function appendMessage(role, content, liveData = null) {
 
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  bubble.textContent = compactMessage(content);
+  appendFormattedText(bubble, compactMessage(content));
 
   if (role === "assistant") {
     const responseStack = document.createElement("div");
@@ -94,6 +94,21 @@ function compactMessage(content) {
     .join("\n")
     .replace(/\n{2,}/g, "\n")
     .trim();
+}
+
+function appendFormattedText(element, content) {
+  const boldPattern = /\*\*(.+?)\*\*/gs;
+  let cursor = 0;
+
+  for (const match of content.matchAll(boldPattern)) {
+    element.append(document.createTextNode(content.slice(cursor, match.index)));
+    const strong = document.createElement("strong");
+    strong.textContent = match[1];
+    element.append(strong);
+    cursor = match.index + match[0].length;
+  }
+
+  element.append(document.createTextNode(content.slice(cursor)));
 }
 
 function setBusy(busy) {
